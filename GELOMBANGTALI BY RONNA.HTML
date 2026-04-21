@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Lab Fisika Gelombang - Solusi Miskonsepsi</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .main-container { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 950px; }
+        canvas { background: #1a1a1a; border-radius: 8px; display: block; margin-bottom: 15px; border: 3px solid #333; }
+        .panel { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background: #f8f9fa; padding: 20px; border-radius: 10px; border: 1px solid #ddd; }
+        .control-group { display: flex; flex-direction: column; gap: 10px; }
+        .data-display { background: #2d3436; color: #00cec9; padding: 12px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; border-left: 5px solid #00cec9; }
+        button { padding: 12px; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; transition: 0.3s; }
+        .btn-capture { background: #0984e3; color: white; width: 100%; margin-top: 10px; }
+        .btn-mode { background: #6c5ce7; color: white; }
+        table { width: 100%; margin-top: 25px; border-collapse: collapse; font-size: 0.9em; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #0984e3; color: white; }
+        .row-m1 { background-color: #fff5f5; }
+        .row-m2 { background-color: #f0f7ff; }
+        .unit-label { float: right; color: #d63031; font-weight: bold; font-size: 0.8em; background: #f8d7da; padding: 0 4px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <h2 style="text-align: center;">Laboratorium Virtual Gelombang Tali</h2>
+    <div id="modeStatus" style="font-weight: bold; color: #d35400; margin-bottom: 10px;">MODE: EKSPERIMEN TUNGGAL</div>
+    
+    <canvas id="mainCanvas" width="900" height="220"></canvas>
+    
+    <div class="panel">
+        <div class="control-group">
+            <label><b>SUMBER GETAR</b></label>
+            <label>Amplitudo: <span class="unit-label" id="ampVal">40 cm</span><input type="range" id="amp" min="5" max="80" value="40"></label>
+            <label>Frekuensi: <span class="unit-label" id="freqVal">1.5 Hz</span><input type="range" id="freq" min="0.5" max="3" step="0.1" value="1.5"></label>
+            <button class="btn-mode" onclick="toggleMode()">🔄 GANTI KE MODE 2 MEDIUM</button>
+        </div>
+
+        <div class="control-group">
+            <label><b>MEDIUM TALI</b></label>
+            <label id="labelTali">Pilih Tali: 
+                <select id="mu">
+                    <option value="0.01">Nilon (Ringan: 0.01 kg/m)</option>
+                    <option value="0.05" selected>Karet (Sedang: 0.05 kg/m)</option>
+                    <option value="0.25">Tambang (Berat: 0.25 kg/m)</option>
+                </select>
+            </label>
+            <label>Tegangan (T): <span class="unit-label" id="tensionVal">100 N</span><input type="range" id="tension" min="10" max="200" value="100"></label>
+            <div class="data-display" id="monitor">v = 0 m/s | λ = 0 m</div>
+            <button class="btn-capture" onclick="captureData()">📸 AMBIL DATA EKSPERIMEN</button>
+        </div>
+    </div>
+
+    <table id="dataTable">
+        <thead>
+            <tr>
+                <th>No</th>
+                <th>Medium (μ)</th>
+                <th>Tegangan (T)</th>
+                <th>Frekuensi (f)</th>
+                <th>Cepat Rambat (v)</th>
+                <th>Panjang Gelombang (λ)</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    let t = 0;
+    let isBoundaryMode = false;
+    let dataCount = 0;
+    let isRunning = true;
+
+    function toggleMode() {
+        isBoundaryMode = !isBoundaryMode;
+        document.getElementById('modeStatus').innerText = isBoundaryMode ? "MODE: 2 MEDIUM (KONTRAS)" : "MODE: EKSPERIMEN TUNGGAL";
+        document.getElementById('labelTali').style.opacity = isBoundaryMode ? "0.3" : "1";
+        document.getElementById('mu').disabled = isBoundaryMode;
+    }
+
+    function render() {
+        if (!isRunning) return;
+        document.getElementById('ampVal').innerText = document.getElementById('amp').value + " cm";
+        document.getElementById('freqVal').innerText = document.getElementById('freq').value + " Hz";
+        document.getElementById('tensionVal').innerText = document.getElementById('tension').value + " N";
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let A = parseFloat(document.getElementById('amp').value);
+        let f = parseFloat(document.getElementById('freq').value);
+        let T = parseFloat(document.getElementById('tension').value);
+        let omega = 2 * Math.PI * f;
+
+        if (!isBoundaryMode) {
+            let mu = parseFloat(document.getElementById('mu').value);
+            let v = Math.sqrt(T / mu);
+            let lambda = v / f;
+            let k = (2 * Math.PI) / (lambda * 8);
+            document.getElementById('monitor').innerText = `v = ${v.toFixed(2)} m/s | λ = ${lambda.toFixed(2)} m`;
+
+            for (let x = 0; x < canvas.width; x += 10) {
+                let y = A * Math.sin(k * x - omega * t) + 110;
+                ctx.fillStyle = (x === 0) ? "#0984e3" : "#ff7675";
+                ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
+            }
+        } else {
+            let mu1 = 0.25; let mu2 = 0.01;
+            let v1 = Math.sqrt(T / mu1); let v2 = Math.sqrt(T / mu2);
+            let k1 = (2 * Math.PI) / ((v1/f) * 8);
+            let k2 = (2 * Math.PI) / ((v2/f) * 8);
+            document.getElementById('monitor').innerHTML = `v1: ${v1.toFixed(1)} | v2: ${v2.toFixed(1)} m/s`;
+
+            ctx.setLineDash([5, 5]); ctx.strokeStyle = "#555";
+            ctx.beginPath(); ctx.moveTo(450, 0); ctx.lineTo(450, 220); ctx.stroke(); ctx.setLineDash([]);
+
+            for (let x = 0; x < canvas.width; x += 10) {
+                let y = (x < 450) ? A * Math.sin(k1 * x - omega * t) + 110 : A * Math.sin(k2 * x + (k1 - k2) * 450 - omega * t) + 110;
+                ctx.fillStyle = (x < 450) ? "#ff7675" : "#74b9ff";
+                ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2); ctx.fill();
+            }
+        }
+        t += 0.02;
+        requestAnimationFrame(render);
+    }
+
+    function captureData() {
+        dataCount++;
+        let f = document.getElementById('freq').value;
+        let T = document.getElementById('tension').value;
+        let table = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
+
+        if (!isBoundaryMode) {
+            addTableRow(table, dataCount, document.getElementById('mu').value, T, f, "");
+        } else {
+            addTableRow(table, dataCount + " (M2)", 0.01, T, f, "row-m2");
+            addTableRow(table, dataCount + " (M1)", 0.25, T, f, "row-m1");
+        }
+        isRunning = false; setTimeout(() => { isRunning = true; render(); }, 500);
+    }
+
+    function addTableRow(table, id, mu, T, f, className) {
+        let v = Math.sqrt(T / mu);
+        let lambda = v / f;
+        let row = table.insertRow(0);
+        if(className) row.className = className;
+        row.innerHTML = `<td>${id}</td><td>${mu}</td><td>${T} N</td><td>${f} Hz</td><td><b>${v.toFixed(2)}</b></td><td>${lambda.toFixed(2)}</td>`;
+    }
+
+    render();
+</script>
+</body>
+</html>
